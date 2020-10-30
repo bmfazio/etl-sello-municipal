@@ -1,0 +1,7 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+electron-quick-start/
+rsconnect/
+*.zip
