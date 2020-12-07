@@ -9,6 +9,10 @@ library(lubridate)
 library(shiny)
 options(shiny.maxRequestSize = 10*1024^2)
 
+# t1 <- "C:/Users/Asus-N56/Desktop/insumos2/1. LB y metas_periodo2_1874GL(1).xlsx"
+# t2 <- "C:/Users/Asus-N56/Desktop/insumos2/2. Matriz Reporte de seguimiento Tablero prueba.xlsx"
+# t3 <- "C:/Users/Asus-N56/Desktop/insumos2/3. indicadores(1).xlsx"
+
 # Funcion para nombrar meses
 mes2txt <- function(tmp_mes){
   case_when(
@@ -36,7 +40,7 @@ calcular_campos <- function(tmp_data) {
           tipo_indicador == "porcentaje" ~ valor_indicador,
           tipo_indicador == "conteo" ~ valor_indicador / meta
         ) + 0.1,
-      valor_propmeta = valor_indicador / meta,
+      # valor_propmeta = valor_indicador / meta,
       cierre_indicador_txt =
         mes2txt(month(cierre_indicador)) %>% paste(year(cierre_indicador)),
       lb_formato =
@@ -62,16 +66,10 @@ calcular_campos <- function(tmp_data) {
             paste(round(100 * valor_indicador, 2), "%"),
           TRUE ~ "-"
         ),
-      semaforo_bien = as.integer(0.9 <= valor_propmeta),
-      semaforo_regular = as.integer(0.7 <= valor_propmeta &
-                                      valor_propmeta < 0.9),
-      semaforo_mal = as.integer(valor_propmeta < 0.7),
-      semaforo_txt =
-        case_when(
-          semaforo_bien == 1 ~ "Buen avance",
-          semaforo_regular == 1 ~ "Avance regular",
-          semaforo_mal == 1 ~ "En riesgo"
-        ),
+      semaforo_txt = case_when(is.na(valor_indicador) ~ "", TRUE ~ semaforo_txt),
+      semaforo_bien = as.integer(semaforo_txt == "Buen avance"),
+      semaforo_regular = as.integer(semaforo_txt == "Regular"),
+      semaforo_mal = as.integer(semaforo_txt == "En riesgo"),
       detalle_txt =
         case_when(
           tipo_indicador == "porcentaje" ~
@@ -170,11 +168,11 @@ procesar <- function(t1, t2, t3){
                     substr(name, 1, 2) == "N_" ~ "valor_numerador",
                     substr(name, 1, 2) == "D_" ~ "valor_denominador",
                     substr(name, 1, 6) == "Valor " ~ "valor_indicador",
-                    substr(name, 1, 13) == "Calificación " ~ "semaforo",
+                    substr(name, 1, 13) == "Calificación " ~ "semaforo_txt",
                     TRUE ~ name
                     )) %>%
         # Excluir filas con informacion que no sera usada
-        filter(!(new_names %in% c("lb", "meta", "semaforo"))) %>%
+        filter(!(new_names %in% c("lb", "meta"))) %>%
         # Colocar ID de indicador en cada fila
         mutate(
             id_indicador =
@@ -186,7 +184,7 @@ procesar <- function(t1, t2, t3){
                         case_when(
                             tipo_indicador == "porcentaje" ~ 2,
                             tipo_indicador == "conteo" ~ 0)*num_mediciones + # num + dem
-                        num_mediciones # valor + calificacion
+                        num_mediciones*2 # valor + calificacion
                     ) %>%
                 apply(1, function(x)rep(x[1], each = x[2])) %>% unlist %>%
                 rep(nrow(valores))
@@ -199,11 +197,12 @@ procesar <- function(t1, t2, t3){
     bind_rows(
         tibble(
             tipo_indicador = "porcentaje",
-            tiempo_medicion = c(rep(1:num_mediciones, each = 2), 1:num_mediciones)) %>%
+            tiempo_medicion = c(rep(1:num_mediciones, each = 2),
+                                rep(1:num_mediciones, times = 2))) %>%
             mutate(tmp_orden = 1:n()),
         tibble(
             tipo_indicador = "conteo",
-            tiempo_medicion = 1:num_mediciones) %>%
+            tiempo_medicion = rep(1:num_mediciones, times = 2)) %>%
             mutate(tmp_orden = 1:n())) -> tiempos_indicador
     
     ### Union de tablas
