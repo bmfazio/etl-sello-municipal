@@ -9,10 +9,6 @@ library(lubridate)
 library(shiny)
 options(shiny.maxRequestSize = 10*1024^2)
 
-# t1 <- "C:/Users/Asus-N56/Desktop/insumos2/1. LB y metas_periodo2_1874GL(1).xlsx"
-# t2 <- "C:/Users/Asus-N56/Desktop/insumos2/2. Matriz Reporte de seguimiento Tablero prueba.xlsx"
-# t3 <- "C:/Users/Asus-N56/Desktop/insumos2/3. indicadores(1).xlsx"
-
 # Funcion para nombrar meses
 mes2txt <- function(tmp_mes){
   case_when(
@@ -303,6 +299,36 @@ procesar <- function(t1, t2, t3){
     return(datos_final)
 }
 
+hprocesar <- function(tablah){
+  
+  h_encabezado <- read_xlsx(
+    tablah, skip = 2, n_max = 1) %>%
+    unlist %>% unique
+  h_encabezado <- h_encabezado[!is.na(h_encabezado)]
+  
+  h_datos <- read_xlsx(
+    tablah, skip = 4) %>% filter(!is.na(Ubigeo))
+  
+  names(h_datos) %>% grep(pattern = "Ubigeo", .) -> pos_inicio
+  names(h_datos) %>% grep(pattern = "GL convocado", .) -> pos_datos
+  names(h_datos) %>% grep(pattern = "Veces participa SM", .) -> pos_fin
+  
+  names(h_datos[, c(pos_inicio:(min(pos_datos)-1))]) -> cols_fixed
+  names(h_datos[, c(min(pos_datos):(pos_fin-1))]) -> cols_datos
+
+  h_datos %>%
+    select(cols_fixed, cols_datos) %>%
+    pivot_longer(cols = cols_datos) %>%
+    mutate(edicion =
+             rep(rep(h_encabezado,
+                   times = diff(c(pos_datos, pos_fin))),
+                 length(unique(Ubigeo))),
+           name = gsub("\\.+[0-9]+", "", name),
+           orden = 1:n()) -> historico_limpio
+  
+  return(historico_limpio)
+}
+
 # Construir aplicativo
 ui <- fluidPage(
 
@@ -320,7 +346,12 @@ ui <- fluidPage(
     # Enlaces para descarga
     downloadLink("procesado1", label = "Descargar Procesado 1"),
     br(),
-    downloadLink("procesado2", label = "Descargar Procesado 2")
+    downloadLink("procesado2", label = "Descargar Procesado 2"),
+    br(), br(),
+    # Procesamiento para tablero historico
+    fileInput("htab", "Cargar reporte histórico",
+              accept = ".xlsx"),
+    downloadLink("procesadoh", label = "Descargar histórico procesado")
 )
 
 # Define server logic required to draw a histogram
@@ -328,6 +359,10 @@ server <- function(input, output) {
     
     procesado <- reactive({
         procesar(input$t01$datapath, input$t02$datapath, input$t03$datapath)
+    })
+    
+    hprocesado <- reactive({
+        hprocesar(input$htab$datapath)
     })
     
     output$procesado1 <- downloadHandler(
@@ -346,6 +381,13 @@ server <- function(input, output) {
                        semaforo_txt, valor_indicador_formato, valor_propmax) %>%
                 mutate(provigeo = substr(ubigeo, 1, 4)),
               file)
+        }
+    )
+    
+    output$procesadoh <- downloadHandler(
+        filename = "procesado-historico.xlsx",
+        content = function(file) {
+            write.xlsx(hprocesado(), file)
         }
     )
     
