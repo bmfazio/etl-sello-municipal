@@ -9,6 +9,9 @@ library(lubridate)
 library(shiny)
 options(shiny.maxRequestSize = 10*1024^2)
 
+# Cargar anho inicial
+initYear <- readLines("inicio.txt", n = 1, warn = F)
+
 # Funcion para nombrar meses
 mes2txt <- function(tmp_mes){
   case_when(
@@ -107,7 +110,7 @@ procesar <- function(t1, t2, t3){
             grep(pattern = "^UBIGEO|REGION|PROVINCIA|DISTRITO", .),
         # Detectar columnas de inscripcion mas reciente
         names(basales) %>%
-            grep(pattern = paste("Inscritas SM", year(Sys.Date())), .),
+            grep(pattern = paste("Inscritas SM", initYear), .),
         # Detectar columnas de basal y meta
         names(basales) %>%
             grep(pattern = "LINEA DE BASE|META", .))] %>%
